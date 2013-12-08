@@ -268,21 +268,24 @@ function createJRemixer(context, jquery) {
                 return gainValue;
             }
 
+            var letItRide = false;
             function playQuantum(when, q) {
                 var now = context.currentTime;
                 var start = when == 0 ? now : when;
                 var duration = q.duration * speedFactor;
                 var next = start + duration;
 
-                if (false && speedFactor == 1 && curQ && curQ.track === q.track && curQ.which + 1 == q.which) {
+                if (letItRide && speedFactor == 1 && curQ && curQ.track === q.track && curQ.which + 1 == q.which) {
                     // let it ride
                 } else {
                     var audioSource = context.createBufferSource();
                     audioGain.gain.value = gainValue;
                     audioSource.buffer = q.track.buffer;
                     audioSource.connect(audioGain);
-                    // var tduration = track.audio_summary.duration - q.start;
                     var tduration = q.duration
+                    if (letItRide) {
+                        tduration = track.audio_summary.duration - q.start;
+                    }
                     audioSource.noteGrainOn(start, q.start, tduration);
                     if (curAudioSource) {
                         curAudioSource.noteOff(start);

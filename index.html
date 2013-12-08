@@ -158,65 +158,7 @@ function trackReady(t) {
 }
 
 
-function findBestTrackTimesOld(t) {
-    var best = 0;
-    var bestIndex = 0;
-
-    for (var i = 0; i < t.analysis.beats.length; i++) {
-        var start = t.analysis.beats[i].start;
-        var end = start + curSongTime + curSegueTime;
-        var count = 0;
-        var bestSum = 0;
-        for (j = i; j < t.analysis.beats.length; j++) {
-            var beat = t.analysis.beats[j];
-            // bestSum += getLoudness(beat)
-            bestSum += beat.confidence;
-            count++;
-            if (beat.start >= end) {
-                break;
-            }
-        }
-
-        if (bestSum > best) {
-            best = bestSum;
-            bestIndex = i;
-            console.log('loud', i, best);
-        }
-    }
-    t.firstBeat  = t.analysis.beats[40];
-    t.firstBeat  = t.analysis.beats[bestIndex];
-}
-
-function findBestTrackTimes2(t) {
-    var best = 0;
-    var bestIndex = 0;
-
-    for (var i = 0; i < t.analysis.beats.length; i++) {
-        var start = t.analysis.beats[i].start;
-        var end = start + curSongTime + curSegueTime;
-        var count = 0;
-        var bestSum = 0;
-        for (j = i; j < t.analysis.beats.length; j++) {
-            var beat = t.analysis.beats[j];
-            // bestSum += getLoudness(beat)
-            bestSum += beat.confidence;
-            count++;
-            if (beat.start >= end) {
-                break;
-            }
-        }
-
-        if (bestSum > best) {
-            best = bestSum;
-            bestIndex = i;
-            console.log('loud', i, best);
-        }
-    }
-    t.firstBeat  = t.analysis.beats[40];
-    t.firstBeat  = t.analysis.beats[bestIndex];
-}
-
-function findBestTrackTimes3(t) {
+function findBestTrackTimes(t) {
     var best = 1000000;
     var bestIndex = 0;
 
@@ -302,7 +244,7 @@ function gotTheAnalysis(song, profile) {
             if (state == 1) {
                 info("song is loaded.");
                 t.song = song;
-                findBestTrackTimes3(t);
+                findBestTrackTimes(t);
                 setTimeout( function() { readyToPlay(t); }, 10);
                 //$("#next-tempo-gauge").show();
                 //$("#loading-gauge").hide();
@@ -545,6 +487,7 @@ function Driver(track) {
     var transitionBeats = 0;
     var curTransitionBeat = 0;
     var periodDelta = 0;
+    var nextTime = 0;
 
     // states:
     //  intro, loading, ready-for-transition, transitioning, done, no more
@@ -579,13 +522,22 @@ function Driver(track) {
     function process() {
         beatCount += 1;
         var q = next();
-        var delay = masterPlayer.play(0, q);
+
+        var waitTime = nextTime - masterPlayer.curTime();
+
+        if (waitTime < 0) {
+            waitTime = 0;
+        }
+
+        var delay = masterPlayer.play(waitTime, q);
+        nextTime = delay + waitTime + masterPlayer.curTime();
 
         setTimeout( function () { 
             if (isRunning) {
                 process(); 
             }
-        }, 1000 * delay);
+        }, 1000 * (delay + waitTime) - 5);
+
 
 
         beatGauge.refresh(beatCount);
@@ -619,7 +571,7 @@ function Driver(track) {
 
             masterPlayer.setSpeedFactor(masterTempoFactor);
             npGauge.refresh(Math.round(track.audio_summary.tempo / masterTempoFactor));
-            var delay = slavePlayer.play(0, slave.next());
+            var delay = slavePlayer.play(waitTime, slave.next());
 
             if (curTransitionBeat++ >= transitionBeats) {
                 console.log('intro state');
@@ -628,7 +580,7 @@ function Driver(track) {
                 slave.setMaster(true);
                 masterPlayer.setSpeedFactor(1);
                 slavePlayer.setSpeedFactor(1);
-                slave.start(delay);
+                slave.start(delay + waitTime);
                 var swap = slavePlayer;
                 slavePlayer = masterPlayer;
                 masterPlayer = swap;
