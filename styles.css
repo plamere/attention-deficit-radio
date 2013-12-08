@@ -1,31 +1,24 @@
 #go-radio {
-    margin-top:-1px;
 }
 
 #input-artist {
-    margin-top:7px;
+    margin-top:10px;
 }
 
 #seed-artist {
     margin-left:20px;
 }
 
-#cur-title {
+.title {
+    width:450px;
+    height:40px;
+    overflow:hidden;
 }
 
-#cur-artist {
-}
-
-#cur-tempo-gauge {
-}
-
-#next-tempo-gauge {
-}
-
-#mix-gauge {
-}
-
-#beat-gauge {
+.artist {
+    width:450px;
+    height:28px;
+    overflow:hidden;
 }
 
 
