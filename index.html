@@ -145,12 +145,10 @@ function shutItAllDown() {
 
 
 function trackReady(t) {
-    console.log('trackReady', t);
     var driver = Driver(t);
     if (masterDriver == null) {
         driver.setMaster(true);
         masterDriver.start();
-        console.log('mdn started');
     } else {
         driver.setMaster(false);
         masterDriver.setSlave(driver);
@@ -171,8 +169,7 @@ function findBestTrackTimes(t) {
             var q = t.analysis.beats[j];
             duration += q.duration;
             qlist.push(q);
-            //console.log(duration, curSongTime, curSongTime);
-            if (duration > curSongTime + curSegueTime) {
+            if (duration > 1.0 * curSongTime + curSegueTime) {
                 good = true;
                 break
             }
@@ -183,7 +180,6 @@ function findBestTrackTimes(t) {
             if (deviation < best) {
                 best = deviation;
                 bestIndex = i;
-                // console.log('fbtt3', best, bestIndex);
             }
         }
     }
@@ -324,10 +320,8 @@ function startRadio(seedArtist) {
     }, 
     function(data) {
         info("Got the playlist ...");
-        console.log(data);
         var response = data['response'];
         var songs = response['songs'];
-        console.log('songs', songs.length);
         curPlaylist = songs;
         curSongIndex = 0;
         shutItAllDown();
@@ -345,7 +339,6 @@ function loadNextSong() {
         var curSong = curPlaylist[curSongIndex++];
         info('Loading ...' + curSong.title + ' by ' + curSong.artist_name);
         var trid = curSong.foreign_ids[0].foreign_id.split(':')[2];
-        console.log('loadNextSong', trid);
         loadTrack(curSong, trid);
         return true
     } else {
@@ -356,7 +349,6 @@ function loadNextSong() {
 
 function go() {
     var seedArtist = $("#seed-artist").val();
-    console.log('go-radio', seedArtist, playTime, segueTime);
     if (masterDriver) {
         masterDriver.stop();
         masterDriver = null;
@@ -495,14 +487,12 @@ function Driver(track) {
 
     function stop () {
         if (isMaster) {
-            console.log('stopping master');
             masterPlayer.stop();
             isRunning = false;
         }
     }
 
     function releaseTrack() {
-        console.log('releaseTrack', track);
         track.buffer = null;
         track.song = null;
         track.analysis = null;
@@ -556,7 +546,6 @@ function Driver(track) {
             transitionBeats = Math.round(curSegueTime / q.duration);
             periodDelta = periodDifference / transitionBeats;
             curTransitionBeat = 0;
-            console.log('period difference', periodDifference, periodDelta, transitionBeats);
         }
 
         if (slave && state === 'transitioning') {
@@ -574,7 +563,6 @@ function Driver(track) {
             var delay = slavePlayer.play(waitTime, slave.next());
 
             if (curTransitionBeat++ >= transitionBeats) {
-                console.log('intro state');
                 stop();
                 releaseTrack();
                 slave.setMaster(true);
@@ -650,7 +638,6 @@ function Driver(track) {
         },
 
         setSlave: function(theSlave) {
-            console.log('master driver has a slave');
             slave = theSlave;
             state = 'ready-for-transition';
         }
