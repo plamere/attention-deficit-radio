@@ -1,0 +1,164 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link rel="stylesheet" href="styles.css" type="text/css" media="screen">
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+<script src="js/underscore-min.js" type="text/javascript" charset="utf-8"></script>
+<title> Swap the Drop</title>
+</head>
+
+<body>
+<div id="wrap" class="navbar navbar-inverse">
+  <div class="navbar-inner">
+    <div class="container">
+      <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </a>
+      <a id='show-search' class="brand">Swap the Drop</a>
+      <div class="nav-collapse collapse">
+        <ul class="nav">
+          <li><a id='show-main'  href="index.html">Main</a></li>
+          <li class="active"><a id='show-loader' href="loader.html">Pick songs</a></li>
+          <li><a id='show-help' href="help.html">Help</a></li>
+          <li><a id='show-about' href="about.html">About</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="hero" class="hero-unit">
+  <div class="container">
+    <h2> Pick songs </h2>
+        Pick two songs for Swap the Drop
+
+        <div id='select-track'>
+            <div class="well"> 
+                <ol id="selected-list"> </ol>
+                <button class="btn btn-primary" id="go"> Swap the Drop! </button>
+            </div>
+
+            <div id="search-div">
+                <label> Search for songs </label>
+                <span class="input-append">
+                    <input id="search" type="text" placeholder="scary skrillex" value="skrillex"> 
+                    <button class="btn btn-primary" id="go-search"> search </button>
+                </span>
+                <div id="song-list"> </div>
+            </div>
+        </div>
+        <div id='info'> </div> 
+        </div>
+  </div>
+</div>
+
+</body>
+
+<script type="text/javascript">
+
+var selectedSongs = [];
+
+function searchForTrack() {
+    console.log("search for a track");
+    var q = $("#search").val();
+    console.log(q);
+
+    if (q.length > 0) {
+        var url = 'http://labs.echonest.com/Uploader/search'
+        $.getJSON(url, { q:q, results:30}, function(data) {
+            console.log(data);
+            for (var i = 0; i < data.length; i++) {
+                data[i].id = data[i].trid;
+            }
+            listTracks('#search-list', data);
+        });
+    }
+}
+
+function listTracks(active, tracks) {
+    $('#song-div').show();
+    $('#song-list').empty();
+    $('.sel-list').removeClass('activated');
+    $(active).addClass('activated');
+    for (var i = 0; i < tracks.length; i++) {
+        var s = tracks[i];
+        var item = listSong(s);
+        if (item) {
+            $('#song-list').append(listSong(s));
+        }
+    }
+}
+
+
+function showSelection() {
+    $("#selected-list").empty();
+    for (var i = 0; i < selectedSongs.length; i++) {
+        var r = selectedSongs[i];
+        var title = getTitle(r.title, r.artist, null);
+        var li = $("<li>");
+        li.text(title);
+        $("#selected-list").append(li);
+    }
+    if (selectedSongs.length == 2) {
+        $("#go").show();
+    }
+}
+
+function listSong(r) {
+    var title = getTitle(r.title, r.artist, null);
+    var item = null;
+    if (title) {
+        var item = $('<li>').append(title);
+
+        item.attr('class', 'song-link');
+        item.click(function() {
+                selectedSongs.push(r);
+                if (selectedSongs.length > 2) {
+                    selectedSongs.shift();
+                }
+                showSelection();
+                console.log(selectedSongs);
+            });
+    } 
+    return item;
+}
+
+function getTitle(title, artist, url) {
+    if (title == undefined || title.length == 0 || title === '(unknown title)' || title == 'undefined') {
+        if (url) {
+            title = extractTitle(url);
+        } else {
+            title = null;
+        }
+    } else {
+        if (artist !== '(unknown artist)') {
+            title = title + ' by ' + artist;
+        } 
+    }
+    return title;
+}
+
+
+function init() {
+    $("#go").hide();
+    $("#go-search").click(function() {
+        searchForTrack();
+    });
+
+    $("#go").click(function() {
+        document.location = "go.html?trid=" + selectedSongs[0].trid + "&trid2=" + selectedSongs[1].trid;
+        
+    });
+}
+
+window.onload = init;
+
+
+</script>
+</body>
+</html>
+
+

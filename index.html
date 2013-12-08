@@ -1,0 +1,664 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script src="js/raphael-min.js" type="text/javascript" charset="utf-8"></script>
+<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+<link rel="stylesheet" href="styles.css" type="text/css" media="screen">
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script src="js/underscore-min.js" type="text/javascript" charset="utf-8"></script>
+<script type="text/javascript" src="jremix.js"></script> 
+<title> Attention Deficit Radio</title>
+</head>
+
+<body>
+<div id="wrap" class="navbar navbar-inverse">
+  <div class="navbar-inner">
+    <div class="container">
+      <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </a>
+      <a id='show-search' class="brand">Attention Deficit Radio</a>
+      <div class="nav-collapse collapse">
+        <ul class="nav pull-right">
+          <li><a  id='show-about' href="about.html">About</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container" id='main'>
+    <div id="search-div">
+            <table>
+            <tr>
+                <td>
+                    <label> Pick a seed artist</label>
+                    <span class="no-input-append">
+                    <input id="seed-artist" type="text" placeholder="skrillex" value="skrillex"> 
+                </td>
+
+            <td>
+                <label> Play time</label>
+                <select id="play-time">
+                    <option value=0> asap </option>
+                    <option value="10"> 10 </option>
+                    <option selected value="20"> 20 </option>
+                    <option value="30"> 30 </option>
+                    <option value="40"> 40 </option>
+                    <option value="50"> 50 </option>
+                    <option value="60"> 60 </option>
+                </select>
+            </td>
+
+            <td>
+                <label> Segue Time</label>
+                <select id='segue-time'>
+                    <option value="0"> 0 </option>
+                    <option value="1"> 1 </option>
+                    <option value="2"> 2 </option>
+                    <option value="3"> 3 </option>
+                    <option value="4"> 4 </option>
+                    <option value="6"> 6 </option>
+                    <option value="8"> 8 </option>
+                    <option selected value="10"> 10 </option>
+                </select>
+            </td>
+            <td>
+                <button class="btn btn-primary" id="go-radio"> go </button>
+                <button class="btn btn-primary" id="pause-play"> pause </button>
+            </td>
+            </tr>
+            </table>
+
+    </div>
+</div>
+<div id='error'> </div> 
+<div class="container" id="hero">
+        <div id="cur-artist"> </div>
+        <div id="cur-title"> </div>
+        <div id="cur-tempo"> </div>
+        <div id="actual-tempo"> </div>
+        <div id="beat-time"> </div>
+        <div>
+            <span id='mix-left'> </span>
+            <span id='mix-right'> </span>
+        </div>
+
+        <br>
+        <div id="next-artist"> </div>
+        <div id="next-title"> </div>
+        <div id="next-tempo"> </div>
+        <span id='info'> </span> 
+</div>
+
+
+</body>
+<script src="bootstrap/js/bootstrap.min.js"></script>
+
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-3675615-27']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type =
+'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' :
+'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0];
+s.parentNode.insertBefore(ga, s);
+  })();
+
+</script>
+
+<script type="text/javascript">
+
+var cid = 'CAMVZJD142B9182222';
+var apiKey = 'WWM4H1RBU8OP0ZTQZ';
+var cacheApiCalls = true;
+
+var curSongIndex = 0;
+var curPlaylist = [];
+var remixer;
+var masterDriver = null;
+var masterPlayer;
+var slavePlayer;
+var curSongTime;
+var curSegueTime;
+
+function info(s) {
+    $("#info").text(s);
+}
+
+function error(s) {
+    if (s.length == 0) {
+        $("#error").hide();
+    } else {
+        $("#error").text(s);
+        $("#error").show();
+    }
+}
+
+
+function loadTrack(song, trid) {
+    fetchAnalysis(song, trid);
+}
+
+
+function shutItAllDown() {
+    if (masterPlayer) {
+        masterPlayer.stop();
+        masterPlayer.setGain(1)
+        $("#cur-artist").text("");
+        $("#cur-title").text("");
+        $("#cur-tempo").text("");
+        $("#next-artist").text("");
+        $("#next-title").text("");
+        $("#next-tempo").text("");
+    }
+    masterDriver = null;
+}
+
+
+
+function trackReady(t) {
+    console.log('trackReady', t);
+    var driver = Driver(t);
+    if (masterDriver == null) {
+        driver.setMaster(true);
+        masterDriver.start();
+        console.log('mdn started');
+    } else {
+        driver.setMaster(false);
+        masterDriver.setSlave(driver);
+    }
+}
+
+
+function findBestTrackTimesOld(t) {
+    var best = 0;
+    var bestIndex = 0;
+
+    for (var i = 0; i < t.analysis.beats.length; i++) {
+        var start = t.analysis.beats[i].start;
+        var end = start + curSongTime + curSegueTime;
+        var count = 0;
+        var bestSum = 0;
+        for (j = i; j < t.analysis.beats.length; j++) {
+            var beat = t.analysis.beats[j];
+            // bestSum += getLoudness(beat)
+            bestSum += beat.confidence;
+            count++;
+            if (beat.start >= end) {
+                break;
+            }
+        }
+
+        if (bestSum > best) {
+            best = bestSum;
+            bestIndex = i;
+            console.log('loud', i, best);
+        }
+    }
+    t.firstBeat  = t.analysis.beats[40];
+    t.firstBeat  = t.analysis.beats[bestIndex];
+}
+
+function findBestTrackTimes2(t) {
+    var best = 0;
+    var bestIndex = 0;
+
+    for (var i = 0; i < t.analysis.beats.length; i++) {
+        var start = t.analysis.beats[i].start;
+        var end = start + curSongTime + curSegueTime;
+        var count = 0;
+        var bestSum = 0;
+        for (j = i; j < t.analysis.beats.length; j++) {
+            var beat = t.analysis.beats[j];
+            // bestSum += getLoudness(beat)
+            bestSum += beat.confidence;
+            count++;
+            if (beat.start >= end) {
+                break;
+            }
+        }
+
+        if (bestSum > best) {
+            best = bestSum;
+            bestIndex = i;
+            console.log('loud', i, best);
+        }
+    }
+    t.firstBeat  = t.analysis.beats[40];
+    t.firstBeat  = t.analysis.beats[bestIndex];
+}
+
+function findBestTrackTimes3(t) {
+    var best = 1000000;
+    var bestIndex = 0;
+
+    for (var i = 0; i < t.analysis.beats.length; i++) {
+        var duration = 0;
+        var qlist = [];
+        var good = false;
+
+        for (j = i; j < t.analysis.beats.length; j++) {
+            var q = t.analysis.beats[j];
+            duration += q.duration;
+            qlist.push(q);
+            //console.log(duration, curSongTime, curSongTime);
+            if (duration > curSongTime + curSegueTime) {
+                good = true;
+                break
+            }
+        }
+
+        if (good) {
+            deviation = getDeviation(qlist);
+            if (deviation < best) {
+                best = deviation;
+                bestIndex = i;
+                // console.log('fbtt3', best, bestIndex);
+            }
+        }
+    }
+    t.firstBeat  = t.analysis.beats[bestIndex];
+}
+
+
+function getDeviation(qlist) {
+    var sum = 0;
+    _.each(qlist, function(q) {
+        sum += q.duration;
+    });
+
+    var avg = sum / qlist.length;
+    var ss = 0;
+
+    _.each(qlist, function(q) {
+        var delta = q.duration - avg;
+        ss += delta * delta;
+    });
+    return ss / qlist.length;
+}
+
+function getSum(qlist) {
+    var sum = 0;
+    _.each(qlist, function(q) {
+        sum += q.duration;
+    });
+    return sum;
+}
+
+function getLoudness(beat) {
+    if ('oseg' in beat) {
+        return 60 + beat.oseg.loudness_max;
+    } else {
+        return 0;
+    }
+}
+
+
+function readyToPlay(t) {
+    if (t.status === 'ok') {
+        trackReady(t);
+        info("ready!");
+    } else {
+        info(t.status);
+    }
+}
+
+function gotTheAnalysis(song, profile) {
+    var status = get_status(profile);
+    if (status == 'complete') {
+        info("Loading track ...");
+        remixer.remixTrack(profile.response.track, function(state, t, percent) {
+            track = t;
+            if (state == 1) {
+                info("Here we go ...");
+                t.song = song;
+                findBestTrackTimes3(t);
+                setTimeout( function() { readyToPlay(t); }, 10);
+            } else if (state == 0) {
+                if (percent >= 99) {
+                    info("Here we go ...");
+                } else {
+                    info( percent  + "% of track loaded ");
+                }
+            } else {
+                info('Trouble  ' + t.status);
+                loadNextSong();
+            }
+        });
+    } else if (status == 'error') {
+        info("Sorry, couldn't analyze that track");
+    }
+}
+
+
+function fetchAnalysis(song, trid) {
+    var url = 'http://static.echonest.com/infinite_jukebox_data/' + trid + '.json';
+    info('Fetching the analysis');
+    // showPlotPage(trid);
+    $.getJSON(url, function(data) { gotTheAnalysis(song, data); } )
+        .error( function() { 
+            info("Sorry, can't find info for that track");
+        });
+}
+
+function get_status(data) {
+    if (data.response.status.code == 0) {
+        return data.response.track.status;
+    } else {
+        return 'error';
+    }
+}
+
+function getAudioContext() {
+    if (window.webkitAudioContext) {
+        return new webkitAudioContext();
+    } else {
+        return new AudioContext();
+    }
+}
+
+function now() {
+    return new Date().getTime();
+}
+
+function cacheBuster() {
+    if (!cacheApiCalls) {
+        return now;
+    } else {
+        return 1;
+    }
+}
+
+function startRadio(seedArtist) {
+    info("Getting playlist based upon " + seedArtist);
+    var url = 'http://developer.echonest.com/api/v4/' + 'playlist/static';
+    $.getJSON(url, {
+        api_key:apiKey,
+        type:'catalog',
+        artist:seedArtist,
+        seed_catalog:cid,
+        min_tempo:110,
+        adventurousness:0,
+        results:20,
+        sort:'tempo-asc',
+        bucket:['audio_summary', 'id:' + cid, 'tracks'],
+        limit:true,
+        _:cacheBuster()
+    }, 
+    function(data) {
+        info("Got the playlist ...");
+        console.log(data);
+        var response = data['response'];
+        var songs = response['songs'];
+        console.log('songs', songs.length);
+        curPlaylist = songs;
+        curSongIndex = 0;
+        shutItAllDown();
+        loadNextSong();
+    }, 
+
+    function () {
+        error("Trouble getting music for that artist");
+    }
+    );
+}
+
+function loadNextSong() {
+    if (curSongIndex < curPlaylist.length) { 
+        var curSong = curPlaylist[curSongIndex++];
+        info('Loading ...' + curSong.title + ' by ' + curSong.artist_name);
+        var trid = curSong.foreign_ids[0].foreign_id.split(':')[2];
+        console.log('loadNextSong', trid);
+        loadTrack(curSong, trid);
+        return true
+    } else {
+        return false;
+    }
+}
+
+
+function initUI()  {
+    $("#go-radio").click( function() {
+        console.log('go-radio');
+        var seedArtist = $("#seed-artist").val();
+        var playTime = $("#play-time").val();
+        var segueTime = $("#segue-time").val();
+        console.log('go-radio', seedArtist, playTime, segueTime);
+        if (masterDriver) {
+            masterDriver.stop();
+            masterDriver = null;
+        }
+        curSongTime = parseInt(playTime);
+        curSegueTime = parseInt(segueTime);
+        startRadio(seedArtist);
+    });
+
+    $("#pause-play").click(
+        function() {
+            if (masterDriver) {
+                if (masterDriver.isRunning()) {
+                    masterDriver.stop();
+                } else {
+                    masterDriver.start();
+                }
+            }
+        }
+    );
+}
+
+
+function init() {
+    jQuery.ajaxSettings.traditional = true;  
+
+    if (window.webkitAudioContext === undefined && window.AudioContext === undefined) {
+        error("Sorry, this app needs advanced web audio. Your browser doesn't"
+            + " support it. Try the latest version of Chrome, Firefox (nightly)  or Safari");
+
+        hideAll();
+
+    } else {
+        initUI();
+        var context = getAudioContext();
+        remixer = createJRemixer(context, $);
+        masterPlayer = remixer.getPlayer();
+        slavePlayer = remixer.getPlayer();
+    }
+}
+
+function ngain(g) {
+    var g = 1 - g;
+    g = g * g;
+    return 1 - g;
+}
+
+function Driver(track) {
+    var curQ = track.firstBeat;
+    var isMaster = false;
+    var slave = null;
+    var isRunning = false;
+    var beatCount = 0;
+    var totTime = 0;
+    var transitionBeats = 0;
+    var curTransitionBeat = 0;
+    var periodDelta = 0;
+
+    // states:
+    //  intro, loading, ready-for-transition, transitioning, done, no more
+    var state = 'intro';
+
+    var beatTimeDiv = $("#beat-time");
+    var actualTempo = $("#actual-tempo");
+    var mixLeft = $("#mix-left");
+    var mixRight = $("#mix-right");
+
+    function stop () {
+        if (isMaster) {
+            console.log('stopping master');
+            masterPlayer.stop();
+            isRunning = false;
+        }
+    }
+
+    function releaseTrack() {
+        console.log('releaseTrack', track);
+        track.buffer = null;
+        track.song = null;
+        track.analysis = null;
+    }
+
+    function next() {
+        var q = curQ;
+        curQ = curQ.next;
+
+        if (curQ == null) {
+            curQ = track.firstBeat;
+        }
+        return q;
+    }
+
+
+    function process() {
+        beatCount += 1;
+        var q = next();
+        var delay = masterPlayer.play(0, q);
+
+        beatTimeDiv.text(Math.round(q.start));
+
+        setTimeout( function () { 
+            if (isRunning) {
+                process(); 
+            }
+        }, 1000 * delay);
+
+        if (beatCount > 3 && state === 'intro') {
+            if (loadNextSong()) {
+                state = 'loading';
+            } else {
+                state = 'no more';
+            }
+        }
+
+        if (slave && state === 'ready-for-transition' && totTime >= curSongTime - curSegueTime) {
+            state = 'transitioning';
+            var periodDifference = slave.curQ().duration - q.duration;
+            transitionBeats = Math.round(curSegueTime / q.duration);
+            periodDelta = periodDifference / transitionBeats;
+            curTransitionBeat = 0;
+            console.log('period difference', periodDifference, periodDelta, transitionBeats);
+        }
+
+        if (slave && state === 'transitioning') {
+            var slaveVolume = curTransitionBeat / transitionBeats;
+            var masterVolume = 1 - slaveVolume;
+            var masterTempoFactor = (q.duration + periodDelta * curTransitionBeat) / q.duration
+
+            masterPlayer.setGain(ngain(masterVolume));
+            slavePlayer.setGain(ngain(slaveVolume));
+
+            mixLeft.text(Math.round(masterVolume * 100));
+            mixRight.text(Math.round(slaveVolume * 100));
+
+
+            masterPlayer.setSpeedFactor(masterTempoFactor);
+            actualTempo.text(Math.round(track.audio_summary.tempo));
+            var delay = slavePlayer.play(0, slave.next());
+
+            if (curTransitionBeat++ >= transitionBeats) {
+                console.log('intro state');
+                stop();
+                releaseTrack();
+                slave.setMaster(true);
+                masterPlayer.setSpeedFactor(1);
+                slavePlayer.setSpeedFactor(1);
+                slave.start(delay);
+                var swap = slavePlayer;
+                slavePlayer = masterPlayer;
+                masterPlayer = swap;
+            }
+        }
+
+        totTime += delay;
+    }
+
+    var interface = {
+        start: function(delay) {
+            setTimeout( function () { 
+                isRunning = true;
+                process(); 
+            }, 1000 * delay);
+        },
+
+        stop: function() {
+            if (isMaster) {
+                isRunning = false;
+                masterPlayer.stop();
+            }
+        },
+
+        isRunning: function() {
+            return isRunning;
+        },
+
+        next: function() {
+            return next();
+        },
+
+        curQ: function() {
+            return curQ;
+        },
+
+        process: function() {
+            process();
+        },
+
+        setMaster: function(master) {
+            isMaster = master;
+            if (isMaster) {
+                if (masterDriver && masterDriver.isRunning()) {
+                    masterDriver.stop();
+                }
+                masterDriver = this;
+                this.state = 'intro';
+                $("#cur-artist").text(track.song.artist_name);
+                $("#cur-title").text(track.song.title);
+                $("#cur-tempo").text(Math.round(track.audio_summary.tempo));
+                actualTempo.text(Math.round(track.audio_summary.tempo));
+
+                $("#next-artist").text("");
+                $("#next-title").text("");
+                $("#next-tempo").text("");
+            } else {
+                $("#next-artist").text(track.song.artist_name);
+                $("#next-title").text(track.song.title);
+                $("#next-tempo").text(Math.round(track.audio_summary.tempo));
+            }
+        },
+
+        setSlave: function(theSlave) {
+            console.log('master driver has a slave');
+            slave = theSlave;
+            state = 'ready-for-transition';
+        }
+    }
+
+    return interface;
+}
+
+$(document).ready(function() {
+    init();
+});
+
+
+function ga_track(page, action, id) {
+    _gaq.push(['_trackEvent', page, action, id]);
+}
+</script>
+
