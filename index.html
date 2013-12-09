@@ -301,6 +301,7 @@ function cacheBuster() {
 }
 
 function startRadio(seedArtist) {
+    shutItAllDown();
     info("Getting playlist based upon " + seedArtist);
     error('');
     var url = 'http://developer.echonest.com/api/v4/' + 'playlist/static';
@@ -325,7 +326,6 @@ function startRadio(seedArtist) {
         var songs = response['songs'];
         curPlaylist = songs;
         curSongIndex = 0;
-        shutItAllDown();
         loadNextSong();
     }, 
 
@@ -350,6 +350,11 @@ function loadNextSong() {
 
 function go() {
     var seedArtist = $("#seed-artist").val();
+    document.location = "?seed_artist=" + seedArtist;
+}
+
+function goUrl() {
+    var seedArtist = $("#seed-artist").val();
     if (masterDriver) {
         masterDriver.stop();
         masterDriver = null;
@@ -358,6 +363,31 @@ function go() {
     curSegueTime = parseInt(segueTime);
     startRadio(seedArtist);
 }
+
+function urldecode(str) {
+   return decodeURIComponent((str+'').replace(/\+/g, '%20'));
+}
+
+function processParams() {
+    var params = {};
+    var q = document.URL.split('?')[1];
+    if(q != undefined){
+        q = q.split('&');
+        for(var i = 0; i < q.length; i++){
+            var pv = q[i].split('=');
+            var p = pv[0];
+            var v = pv[1];
+            params[p] = v;
+        }
+    }
+
+    if ('seed_artist' in params) {
+        var seedArtist = urldecode(params['seed_artist']);
+        $("#seed-artist").val(seedArtist);
+        goUrl();
+    }
+}
+
 
 function initUI()  {
 
@@ -464,6 +494,7 @@ function init() {
         remixer = createJRemixer(context, $);
         masterPlayer = remixer.getPlayer();
         slavePlayer = remixer.getPlayer();
+        processParams();
     }
 }
 
@@ -560,10 +591,17 @@ function Driver(track) {
 
         if (slave && state === 'ready-for-transition' && totTime >= curSongTime - curSegueTime) {
             state = 'transitioning';
-            var periodDifference = slave.curQ().duration - q.duration;
-            transitionBeats = Math.round(curSegueTime / q.duration);
-            periodDelta = periodDifference / transitionBeats;
-            curTransitionBeat = 0;
+
+            // see if the new song has good data
+            if (slave.curQ() === undefined) {
+                state = 'intro';
+                loadNextSong();
+            } else {
+                var periodDifference = slave.curQ().duration - q.duration;
+                transitionBeats = Math.round(curSegueTime / q.duration);
+                periodDelta = periodDifference / transitionBeats;
+                curTransitionBeat = 0;
+            }
         }
 
         if (slave && state === 'transitioning') {
