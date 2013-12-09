@@ -595,7 +595,11 @@ function Driver(track) {
             // see if the new song has good data
             if (slave.curQ() === undefined) {
                 state = 'intro';
-                loadNextSong();
+                if (loadNextSong()) {
+                    state = 'loading';
+                } else {
+                    state = 'no more';
+                }
             } else {
                 var periodDifference = slave.curQ().duration - q.duration;
                 transitionBeats = Math.round(curSegueTime / q.duration);
