@@ -30,3 +30,9 @@
 .my-gauge2 {
     width:400px;
     height:300px;
+}
+
+#error {
+    color:red;
+    font-weight:bold;
+}

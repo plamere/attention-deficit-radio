@@ -35,8 +35,8 @@
     </div>
 
 
-<div id='error'> </div> 
 <div class="container" id="hero">
+    <div id='error'> </div> 
     <div class="row">
         <div id="now-playing" class="span6">
            <!-- <div class='my-gauge' id="beat-gauge"> </div> -->
@@ -302,6 +302,7 @@ function cacheBuster() {
 
 function startRadio(seedArtist) {
     info("Getting playlist based upon " + seedArtist);
+    error('');
     var url = 'http://developer.echonest.com/api/v4/' + 'playlist/static';
     $.getJSON(url, {
         api_key:apiKey,
@@ -443,6 +444,9 @@ function initUI()  {
 
 }
 
+function windowHidden() {
+    return document.webkitHidden;
+}
 
 
 function init() {
@@ -480,6 +484,9 @@ function Driver(track) {
     var curTransitionBeat = 0;
     var periodDelta = 0;
     var nextTime = 0;
+    var lateCounter = 0;
+    var lateLimit = 4;
+    var earlyTime = .020;
 
     // states:
     //  intro, loading, ready-for-transition, transitioning, done, no more
@@ -513,22 +520,33 @@ function Driver(track) {
         beatCount += 1;
         var q = next();
 
+        // waitTime if positve, represents how early we are
+        
         var waitTime = nextTime - masterPlayer.curTime();
+
+        if (waitTime < 0) {
+            if (lateCounter++ > lateLimit && windowHidden()) {
+                error("Sorry, can't play music properly in the background. Try running in a separate window");
+                interface.stop();
+                return;
+            } 
+        } else {
+            lateCounter = 0;
+        }
 
         if (waitTime < 0) {
             waitTime = 0;
         }
 
-        var delay = masterPlayer.play(waitTime, q);
-        nextTime = delay + waitTime + masterPlayer.curTime();
+        var nextDuration = masterPlayer.play(waitTime, q);
+        nextTime = nextDuration + waitTime + masterPlayer.curTime();
+        var nextDelay = (nextDuration + waitTime) - earlyTime;
 
         setTimeout( function () { 
             if (isRunning) {
                 process(); 
             }
-        }, 1000 * (delay + waitTime) - 5);
-
-
+        }, 1000 * nextDelay);
 
         beatGauge.refresh(beatCount);
 
@@ -560,7 +578,7 @@ function Driver(track) {
 
             masterPlayer.setSpeedFactor(masterTempoFactor);
             npGauge.refresh(Math.round(track.audio_summary.tempo / masterTempoFactor));
-            var delay = slavePlayer.play(waitTime, slave.next());
+            var slaveDelay = slavePlayer.play(waitTime, slave.next());
 
             if (curTransitionBeat++ >= transitionBeats) {
                 stop();
@@ -568,7 +586,7 @@ function Driver(track) {
                 slave.setMaster(true);
                 masterPlayer.setSpeedFactor(1);
                 slavePlayer.setSpeedFactor(1);
-                slave.start(delay + waitTime);
+                slave.start(nextDuration + waitTime);
                 var swap = slavePlayer;
                 slavePlayer = masterPlayer;
                 masterPlayer = swap;
@@ -576,17 +594,19 @@ function Driver(track) {
             }
         }
 
-        totTime += delay;
+        totTime += nextDuration;
     }
 
     var interface = {
         start: function(delay) {
+            lateCounter = 0;
             setTimeout( function () { 
                 isRunning = true;
                 process(); 
-            }, 1000 * delay);
+            }, 1000 * (delay - earlyTime));
             $("#pause-play").show();
             $("#pause-play").text('Pause');
+            error('');
         },
 
         stop: function() {
